@@ -143,8 +143,17 @@ function signal(t: Tape): Signal {
   let buys = 0;
   const buyers = new Set<string>();
   let high = 0;
-  for (const tr of w) {
-    netSol += tr.buy ? tr.sol : -tr.sol;
+  // Acceleration: inflow must be rising, not fading — the newer half of the
+  // window must bring in at least as much net SOL as the older half.
+  const half = Math.floor(w.length / 2);
+  let netOld = 0;
+  let netNew = 0;
+  for (let i = 0; i < w.length; i++) {
+    const tr = w[i];
+    const d = tr.buy ? tr.sol : -tr.sol;
+    netSol += d;
+    if (i < half) netOld += d;
+    else netNew += d;
     if (tr.buy) {
       buys += 1;
       buyers.add(tr.user);
@@ -162,7 +171,8 @@ function signal(t: Tape): Signal {
     buyers.size >= MIN_BUYERS &&
     priceUp >= MIN_PRICE_UP &&
     priceUp <= MAX_PRICE_UP &&
-    nearHigh >= NEAR_HIGH;
+    nearHigh >= NEAR_HIGH &&
+    netNew >= netOld;
   return { ok, netSol, buys, buyers: buyers.size, priceUp, nearHigh };
 }
 
